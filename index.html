@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>雙人專屬翻譯悄悄話 ❤️</title>
+    <script src="https://js.puter.com/v2/"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #FFF2F2;
+            --primary-color: #FF7597;
+            --secondary-color: #FFB3C6;
+            --text-dark: #4A4A4A;
+            --bubble-me: #FF85A2;
+            --bubble-you: #FFFFFF;
+        }
+
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        body { 
+            background: var(--bg-color); 
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh;
+            color: var(--text-dark);
+        }
+
+        /* 模擬手機外框容器 */
+        .phone-container {
+            width: 100%;
+            max-width: 450px;
+            height: 100vh;
+            background: #FFF9F9;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 24px rgba(255, 117, 151, 0.15);
+            position: relative;
+        }
+
+        /* 頂部導航欄 */
+        .app-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .noti-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        /* 聊天對話區域 */
+        #chat-window {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* 對話氣泡 */
+        .msg-row { display: flex; flex-direction: column; width: 100%; }
+        .msg-row.mine { align-items: flex-end; }
+        .msg-row.yours { align-items: flex-start; }
+
+        .msg-bubble {
+            padding: 12px 16px;
+            border-radius: 20px;
+            max-width: 75%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            font-size: 0.95rem;
+        }
+
+        .mine .msg-bubble {
+            background: var(--bubble-me);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .yours .msg-bubble {
+            background: var(--bubble-you);
+            color: var(--text-dark);
+            border-bottom-left-radius: 4px;
+            border: 1px solid #FFE4E9;
+        }
+
+        /* 媒體內容 */
+        .media-content {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-bottom: 5px;
+        }
+
+        /* 翻譯區塊細節 */
+        .trans-block {
+            font-size: 0.8rem;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dashed rgba(255,255,255,0.4);
+        }
+        .yours .trans-block {
+            border-top: 1px dashed #FFE4E9;
+            color: #7A7A7A;
+        }
+
+        .check-trans {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 2px;
+            display: block;
+        }
+
+        /* 輸入區域 */
+        .input-container {
+            background: white;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-top: 1px solid #FFE4E9;
+        }
+
+        /* 隱藏的原生 file input */
+        #fileInput { display: none; }
+
+        .media-btn {
+            background: #FFF0F2;
+            border: none;
+            color: var(--primary-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #userInput {
+            flex: 1;
+            padding: 10px 16px;
+            border: 1px solid #FFD0DA;
+            border-radius: 20px;
+            outline: none;
+            font-size: 0.95rem;
+            background: #FFF9FA;
+        }
+        #userInput:focus { border-color: var(--primary-color); background: white; }
+
+        #sendBtn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="phone-container">
+    <div class="app-header">
+        <span>💕 我們的專屬小窩</span>
+        <button class="noti-btn" onclick="requestNotificationPermission()">開啟通知</button>
+    </div>
+
+    <div id="chat-window"></div>
+
+    <div class="input-container">
+        <label for="fileInput" class="media-btn">📷</label>
+        <input type="file" id="fileInput" accept="image/*,video/*" onchange="handleMediaUpload(this)">
+        
+        <input type="text" id="userInput" placeholder="寫啲嘢呀...">
+        <button id="sendBtn" onclick="handleSend()">✈️</button>
+    </div>
+</div>
+
+<script>
+    // 1. 填入你的 Firebase 配置 (Spark Plan 免費版即可)
+    const firebaseConfig = {
+        databaseURL: https://toey-97851-default-rtdb.asia-southeast1.firebasedatabase.app/ 
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // 詢問使用者是誰（簡單區分你和女朋友）
+    const USER_NAME = prompt("請輸入你的名字 (例如: 占士 / 阿桃)：") || "神秘人";
+
+    // 請求瀏覽器通知權限
+    function requestNotificationPermission() {
+        if ("Notification" in window) {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") alert("通知功能已成功開啟！");
+            });
+        }
+    }
+
+    // 雙向翻譯邏輯 (使用免 Key 的 Puter.js AI)
+    async function doDualTranslation(text) {
+        // 判斷是否包含泰文字元
+        const isThai = /[\u0E00-\u0E7F]/.test(text);
+        const targetLang = isThai ? 'Traditional Chinese (Cantonese style)' : 'Thai';
+        const backLang = isThai ? 'Thai' : 'Traditional Chinese (Cantonese style)';
+
+        try {
+            // 第一步：初次翻譯
+            const p1 = `Translate this to ${targetLang}. Only return the translated text without quotes: "${text}"`;
+            const translatedText = await puter.ai.chat(p1);
+
+            // 第二步：反向翻譯（驗證啱唔啱）
+            const p2 = `Translate this text back into ${backLang} to verify correctness. Only return the translated text: "${translatedText}"`;
+            const verifiedText = await puter.ai.chat(p2);
+
+            return { translated: translatedText, verified: verifiedText };
+        } catch (e) {
+            console.error(e);
+            return { translated: "翻譯失敗", verified: "無法驗證" };
+        }
+    }
+
+    // 處理媒體上傳 (轉成 Base64 字串存入數據庫，限制大小防塞爆)
+    function handleMediaUpload(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) { // 限制 2MB 以內
+            alert("為了維持免費空間，請選擇 2MB 以下的圖片/影片呀！");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const mediaData = e.target.result;
+            const fileType = file.type.startsWith('image') ? 'image' : 'video';
+            
+            db.ref('messages').push({
+                sender: USER_NAME,
+                type: fileType,
+                mediaUrl: mediaData,
+                original: fileType === 'image' ? '[傳送了圖片]' : '[傳送了影片]',
+                translated: '',
+                verified: '',
+                timestamp: Date.now()
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // 發送文字訊息
+    async function handleSend() {
+        const text = document.getElementById('userInput').value.trim();
+        if (!text) return;
+
+        document.getElementById('userInput').value = '';
+        
+        // 執行雙向翻譯
+        const result = await doDualTranslation(text);
+
+        db.ref('messages').push({
+            sender: USER_NAME,
+            type: 'text',
+            original: text,
+            translated: result.translated,
+            verified: result.verified,
+            timestamp: Date.now()
+        });
+    }
+
+    // 監聽新訊息並即時渲染
+    let isInitialLoad = true;
+    
+    // 先標記第一次載入，避免一開網頁就把舊訊息全部彈通知
+    db.ref('messages').limitToLast(1).once('value', () => {
+        isInitialLoad = false;
+    });
+
+    db.ref('messages').limitToLast(30).on('child_added', (snapshot) => {
+        const msg = snapshot.val();
+        const chatWindow = document.getElementById('chat-window');
+        const isMe = msg.sender === USER_NAME;
+
+        const row = document.createElement('div');
+        row.className = `msg-row ${isMe ? 'mine' : 'yours'}`;
+
+        let contentHtml = '';
+        
+        // 判斷訊息類型
+        if (msg.type === 'image') {
+            contentHtml = `<img src="${msg.mediaUrl}" class="media-content" />`;
+        } else if (msg.type === 'video') {
+            contentHtml = `<video src="${msg.mediaUrl}" class="media-content" controls></video>`;
+        } else {
+            contentHtml = `<div>${msg.original}</div>`;
+        }
+
+        // 如果有翻譯，且不是自己發的媒體訊息，就顯示翻譯與驗證
+        if (msg.translated) {
+            contentHtml += `
+                <div class="trans-block">
+                    <strong>✨ 譯：</strong>${msg.translated}
+                    <span class="check-trans">🔄 反向驗證：${msg.verified}</span>
+                </div>
+            `;
+        }
+
+        row.innerHTML = `<div class="msg-bubble">${contentHtml}</div>`;
+        chatWindow.appendChild(row);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+
+        // 彈出系統通知 (當對方發新訊息，且網頁不在前台時)
+        if (!isInitialLoad && !isMe && Notification.permission === "granted") {
+            new Notification(`💕 ${msg.sender} 有新訊息`, {
+                body: msg.original,
+                icon: 'https://cdn-icons-png.flaticon.com/512/3641/3641323.png' // 可以自己換成你們的頭像
+            });
+        }
+    });
+
+    // 支援 Enter 鍵發送
+    document.getElementById('userInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') handleSend();
+    });
+</script>
+</body>
+</html>
